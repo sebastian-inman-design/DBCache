@@ -26,6 +26,3 @@ $dbcache = new DBCache($config);
 
 $data1 = $dbcache->cache('SELECT * FROM test WHERE id = 1', 'test1');
 $data2 = $dbcache->cache('SELECT * FROM test WHERE id = 2', 'test2');
-
-print_r($data1);
-print_r($data2);
