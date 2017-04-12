@@ -16,60 +16,76 @@
 class DBCache {
 
   /**
-	 * Reference to the database configuration
-	 *
-	 * @var array
-	 */
+   * Reference to the database configuration
+   *
+   * @var array
+   */
 
   protected static $conf;
 
   /**
-	 * Reference to the established database connection
-	 *
-	 * @var void
-	 */
+   * Reference to the established database connection
+   *
+   * @var void
+   */
 
   protected static $mysqli;
 
   /**
-	 * Reference to the temporary cached file
-	 *
-	 * @var string
-	 */
+   * Reference to the temporary cached file
+   *
+   * @var string
+   */
 
   protected static $tempFile;
 
   /**
-	 * Reference to the temporary cached files path
-	 *
-	 * @var string
-	 */
+   * Reference to the temporary cached files path
+   *
+   * @var string
+   */
 
   protected static $tempPath;
 
   /**
-	 * Reference to the cached file handler
-	 *
-	 * @var void
-	 */
+   * Reference to the cached file handler
+   *
+   * @var void
+   */
 
   protected static $tempAuth;
 
   /**
-	 * Reference to contents of the cached file
-	 *
-	 * @var array
-	 */
+   * Reference to contents of the cached file
+   *
+   * @var array
+   */
 
   protected static $cache;
 
+  /**
+   * Reference to error reporting status
+   *
+   * @var boolean    FALSE
+   */
+
+  protected static $reporting = FALSE;
 
   /**
-	 * Initialize the DBCache Class
-	 *
-	 * @param	array     $conf = array()    an array of database connection info
+   * Reference to strict mode - kills process on errors
+   *
+   * @var boolean    TRUE
+   */
+
+  protected static $strict = TRUE;
+
+
+  /**
+   * Initialize the DBCache Class
+   *
+   * @param	array     $conf = array()    an array of database connection info
    * @param string    $path = "cache/"     server location to store cache files
-	 */
+   */
 
   public function __construct($config = array(), $path = "cache/") {
 
@@ -83,7 +99,7 @@ class DBCache {
 
 
   /**
-	 * Begin the caching process
+   * Begin the caching process
    *
    * The system will check to see if a cache of the passed query already exists
    * in the cache directory. If it finds a matching file, the system will ignore
@@ -95,12 +111,12 @@ class DBCache {
    * If the system does not detect an existing cached file, it will perform the
    * database query like normal, then attempt to create a new cache file of the
    * response so the system can use that for future requests.
-	 *
-	 * @param	string    $query = NULL           MySQL query to request from database
+   *
+   * @param	string    $query = NULL           MySQL query to request from database
    * @param string    $file                   name of the temporary file to create
    * @param string    $extension = ".json"    extension of the file to create
    * @param int       $timeout = 1800         time in seconds to keep cached files
-	 */
+   */
 
   public function cache($query = NULL, $file, $extension = ".json", $timeout = 1800) {
 
@@ -152,20 +168,17 @@ class DBCache {
     self::$tempFile = NULL;
     self::$cache = [];
 
-    /* close the database connection */
-    self::$mysqli->close();
-
   }
 
 
   /**
-	 * Clear the current cache files
+   * Clear the current cache files
    *
    * Forces the system to remove all existing local cache files that may exist.
    * The system will then recache any queries being passed into the constructor.
-	 *
-	 * @return	void
-	 */
+   *
+   * @return	void
+   */
 
   public function clear() {
 
@@ -186,26 +199,55 @@ class DBCache {
 
 
   /**
-	 * Return query response from the database
+   * Enable error reporting
+   *
+   * @return	void
+   */
+
+  public function report() {
+
+    self::$reporting = TRUE;
+
+  }
+
+
+  /**
+   * Return query response from the database
    *
    * Handles the request to the database when performing queries and returns the
    * response after formatting it using fetch_assoc().
-	 *
-	 * @param	string    $query    MySQL query to request from database
+   *
+   * @param	string    $query    MySQL query to request from database
    * @return array    $rows     Associated array of database tables
-	 */
+   */
 
   private function response($query) {
 
     /* establish a secure mysqli connection to the database */
-    if(!isset(self::$mysqli)) self::$mysqli = new mysqli($conf["host"], $conf["user"], $conf["pass"], $conf["table"]);
+    if(!isset(self::$mysqli)) self::$mysqli = new mysqli(self::$conf["host"], self::$conf["user"], self::$conf["pass"], self::$conf["table"]);
 
-    /* make sure there's a response before continuing */
-    if($response = self::$mysqli->query($query)) {
+    /* check for connection errors */
+    if(!self::$mysqli->connect_error) {
 
-      /* loop through the database query response */
-      while($row = $response->fetch_assoc()) $rows[] = $row;
-      return $rows;
+      /* make sure there's a response before continuing */
+      if($response = self::$mysqli->query($query)) {
+
+        /* loop through the database query response */
+        while($row = $response->fetch_assoc()) $rows[] = $row;
+        return $rows;
+
+      }
+
+    }else{
+
+      if(self::$reporting) {
+
+        echo 'There was a problem connecting to the database:<br>';
+        print_r(self::$mysqli->connect_error);
+
+      }
+
+      if(self::$strict) exit();
 
     }
 
